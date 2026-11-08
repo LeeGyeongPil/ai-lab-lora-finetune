@@ -1,0 +1,19 @@
+# 모델 내려받기 없이 mock 모드 테스트만 돌린다 (ubuntu CPU, CPU 전용 torch 휠).
+name: ci
+on:
+  push:
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv python install
+      - run: uv sync --locked
+      - run: uv run pytest -q
+        env:
+          HF_HUB_OFFLINE: "1"
+      # CUDA 패키지(수 GB)가 잠금 파일에 섞이지 않았는지 확인
+      - run: "! uv export --locked --no-hashes | grep -i '^nvidia'"
