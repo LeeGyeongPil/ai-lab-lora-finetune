@@ -20,7 +20,7 @@
 
 ## 30초 만에 실행하기
 
-준비물: Python 3.14 + [uv](https://docs.astral.sh/uv/) (파이썬 패키지 관리 도구). 처음이라면 uv부터 설치합니다.
+준비물: Python 3.14 + [uv](https://docs.astral.sh/uv/) (파이썬 패키지 관리 도구) + git. macOS/Linux에서 uv를 설치하려면 curl도 필요합니다(없는 최소 Linux 환경이라면 `apt install git curl` 등으로 먼저 설치). 처음이라면 uv부터 설치합니다.
 
 ```bash
 # macOS / Linux
@@ -29,13 +29,15 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
+설치 직후에는 지금 열려 있는 터미널에서 `uv`가 아직 안 잡힐 수 있습니다. **터미널을 새로 열거나**, macOS/Linux에서는 설치 마지막에 안내되는 `source $HOME/.local/bin/env`를 실행하세요(Windows는 PowerShell을 새로 엽니다). `uv --version`이 나오면 준비 끝입니다.
+
 ```bash
 git clone https://github.com/LeeGyeongPil/ai-lab-lora-finetune.git
 cd ai-lab-lora-finetune
 uv run lora-demo --mock
 ```
 
-`--mock`은 **무작위로 만든 초소형 모델**로 전체 흐름만 확인하는 모드입니다. 네트워크도 필요 없고 약 6초면 끝납니다(첫 실행의 패키지 설치 시간 제외). 실제 말투는 배우지 못하는 것이 정상입니다 — "0/6 → 0/6"이 나와도 고장이 아닙니다. 이 모드는 6단계가 끝까지 도는지, 보고서가 만들어지는지 확인하는 용도입니다.
+`--mock`은 **무작위로 만든 초소형 모델**로 전체 흐름만 확인하는 모드입니다. 네트워크도 필요 없고 약 6초면 끝납니다(첫 실행의 패키지 설치 시간 제외). 실제 말투는 배우지 못하는 것이 정상이고, 모델이 무작위라 답변도 `\x12\x12…` 같은 알아볼 수 없는 글자가 나옵니다(일부러 그런 것입니다) — "0/6 → 0/6"이 나와도 고장이 아닙니다. 이 모드는 6단계가 끝까지 도는지, 보고서가 만들어지는지 확인하는 용도입니다.
 
 ![mock 모드 실행 화면. 장치 확인부터 저장 완료까지 6단계 로그가 보인다.](docs/images/02-mock-run.png)
 <sub>`uv run lora-demo --mock` 실행 결과. [5/6] 학습 단계의 중간 step 줄은 지면상 줄여서 보여 줍니다.</sub>
@@ -46,12 +48,12 @@ uv run lora-demo --mock
 uv run lora-demo
 ```
 
-처음 한 번 모델(약 1GB)을 내려받고, 학습해서, 보고서를 `runs/<날짜-시각>/report.html`에 저장합니다. 브라우저로 그 파일을 열면 됩니다. 어떤 결과가 나오는지 미리 보고 싶다면 레포에 들어 있는 실제 실행 예시 [`examples/sample-run-m3/report.html`](examples/sample-run-m3/report.html)을 먼저 열어 보세요.
+처음 한 번 모델(약 1GB)을 내려받고, 학습해서, 보고서를 `runs/<날짜-시각>/report.html`에 저장합니다. 브라우저로 그 파일을 열면 됩니다. 어떤 결과가 나오는지 미리 보고 싶다면 레포에 들어 있는 실제 실행 예시 `examples/sample-run-m3/report.html`을 먼저 보세요. 이 파일은 GitHub 화면에서 HTML 소스로 보이므로, 위쪽 스크린샷으로 대략을 보거나 레포를 받은 뒤 같은 파일을 브라우저로 직접 열면 됩니다.
 
 | 환경 | 명령 | 참고 |
 |---|---|---|
 | Apple Silicon Mac (MPS) | `uv run lora-demo` | 실측: Apple M3 16GB에서 처음 내려받기 포함 약 179초 (학습 자체는 75스텝, 108초). 기본 설정(bf16, 2문항씩 두 번 누적)의 피크 메모리는 약 5.8GB |
-| Linux / Windows (CPU) | `uv run lora-demo --device cpu --quick` | 1에폭만 학습해 시간을 줄입니다. 실측: Apple M3의 CPU로 모델이 이미 내려받아진 상태에서 약 160초 |
+| Linux / Windows (CPU) | `uv run lora-demo --device cpu --quick` | 1에폭만 학습해 시간을 줄입니다. 실측(Apple M3의 CPU, 모델을 이미 내려받은 상태): 전체 약 2분 40초~3분(그중 학습 약 70초), 결과 0/6 → 6/6. 느린 CPU나 모델을 처음 받는 경우 수 분 이상 걸릴 수 있으며, 약 1GB 내려받기 시간이 더해집니다 |
 | NVIDIA GPU | `uv run lora-demo` (`--device auto`가 CUDA를 고름) | 아래 "자주 겪는 문제" 참고 |
 
 - **메모리**: 한 번에 4문항을 올리면 MPS에서 약 8.7GB를 예약했지만, 2문항씩 두 번 누적(효과는 4문항과 같음)으로 바꿔 약 5.8GB로 줄였습니다. 8GB 맥은 여유가 크지 않으니 다른 앱을 닫고 실행하세요. 모두 한 대의 장비에서 한 번 잰 값입니다.
@@ -117,7 +119,7 @@ uv run lora-demo
 ### 층 하나에서 일어나는 일
 
 ![W와 B·A 계산식 한 층 분량의 계산: W 802,816개, LoRA 14,336개로 약 1.79%.](docs/images/03-param-math.png)
-<sub>모델의 q_proj 한 층(896×896)에 r=8 LoRA를 붙일 때의 숫자 계산. 직접 계산한 값입니다.</sub>
+<sub>모델의 q_proj 한 층(896×896)에 r=8 LoRA를 붙일 때의 숫자 계산. 직접 계산한 값입니다. 계산식: W = 896×896 = 802,816, LoRA = r×(896+896) = 8×1,792 = 14,336, 비율 = 14,336÷802,816 ≈ 1.79%.</sub>
 
 ```mermaid
 flowchart LR
@@ -165,7 +167,7 @@ flowchart TD
 |---|---|
 | [`src/lora_demo/lora.py`](src/lora_demo/lora.py) | LoRA 붙이기, 학습 파라미터 수 세기, rank 계산표 |
 | [`src/lora_demo/data.py`](src/lora_demo/data.py) | 대화를 학습용 숫자열로 바꾸고 질문 부분을 가리기 |
-| [`src/lora_demo/train.py`](src/lora_demo/train.py) | 직접 쓴 짧은 학습 루프 (약 40줄) |
+| [`src/lora_demo/train.py`](src/lora_demo/train.py) | 직접 쓴 짧은 학습 루프 (52줄) |
 | [`src/lora_demo/evaluate.py`](src/lora_demo/evaluate.py) | 답변 생성, 말투 적중 판정, 어댑터 끄기 확인 |
 | [`src/lora_demo/report.py`](src/lora_demo/report.py) | 결과를 HTML 보고서 한 장으로 만들기 (외부 파일·네트워크 없음) |
 | [`src/lora_demo/cli.py`](src/lora_demo/cli.py) | `lora-demo` 명령과 6단계 진행 |
@@ -219,7 +221,7 @@ opt.step()        # 모아 둔 기울기로 한 번 갱신
 
 ## 직접 바꿔 보기
 
-1. **rank 줄이기** — `uv run lora-demo --rank 4 --targets qv` → 학습 파라미터가 270,336개, 어댑터가 약 1.1MB로 줄어듭니다(보고서의 rank 표와 같은 값). 말투가 어떻게 달라지는지 보고서에서 비교해 보세요. rank가 작을수록 결과가 더 흔들릴 수 있습니다.
+1. **rank 줄이기** — `uv run lora-demo --rank 4 --targets qv` → 학습 파라미터가 270,336개, 어댑터가 약 1.1MB로 줄어듭니다(보고서의 rank 표와 같은 값). 말투가 어떻게 달라지는지 보고서에서 비교해 보세요. rank가 작을수록 결과가 더 흔들릴 수 있습니다. CPU에서 `--quick`(1에폭)과 합치면 말투를 거의 못 배워 0/6 → 0/6이 나올 수 있으니(이 맥의 CPU 실측, 학습 약 45초) 실패가 아닙니다. 이 실험은 `--quick` 없이 `uv run lora-demo --device cpu --rank 4 --targets qv`로 돌리세요(같은 맥 CPU 실측: 0/6 → 6/6, 전체 약 3분).
 2. **학습 길이·속도 바꾸기** — `--epochs 1`, `--lr 1e-4`, `--seed 1` 등. 학습률(lr)이 너무 낮으면 말투가 덜 배워지고, 이 데모의 기본값은 3e-4입니다. 같은 설정에서 seed만 바꿔도 적중 개수가 흔들릴 수 있습니다.
 3. **내 데이터로 학습하기** — `uv run lora-demo --data 내파일.jsonl`. 형식은 한 줄에 대화 하나입니다.
 
@@ -227,7 +229,7 @@ opt.step()        # 모아 둔 기울기로 한 번 갱신
    {"messages": [{"role": "user", "content": "질문"}, {"role": "assistant", "content": "내가 원하는 말투의 답"}]}
    ```
 
-   내 데이터를 쓰면 "냥체 적중률"은 계산하지 않습니다. 대신 보고서의 전/후 답변 표로 직접 비교하세요.
+   내 데이터를 쓰면 "냥체 적중률"은 계산하지 않습니다. 또한 전/후 답변을 비교하는 평가 질문은 내 데이터와 상관없이 기본 6개(`data/eval_prompts.json`, 냥체용 질문)가 그대로 쓰입니다. 내 분야의 질문으로 비교하고 싶다면 이 파일의 질문을 직접 바꿔 저장한 뒤 실행하세요. 보고서의 전/후 답변 표로 직접 비교하면 됩니다.
 4. **결과 위치** — 실행 결과는 `runs/`에 쌓이고 최근 5개만 남습니다(`--keep-runs`로 변경). 어댑터 한 개가 17.6MB이므로 무한히 쌓이지 않게 한 것입니다.
 
 보고서만 다시 만들고 싶다면:
@@ -250,20 +252,21 @@ uv run python -m lora_demo.report <result.json> <출력.html>
 
 | 증상 | 원인 | 해결 |
 |---|---|---|
-| `uv: command not found` | uv 미설치 | 위 "30초 만에 실행하기"의 설치 명령 실행 후 터미널을 다시 엽니다 |
+| `uv: command not found` | uv 미설치, 또는 설치 직후 현재 터미널에 아직 반영 안 됨 | 위 "30초 만에 실행하기"의 설치 명령 실행 후 터미널을 새로 열거나 `source $HOME/.local/bin/env`를 실행합니다 |
 | Python 3.14를 찾을 수 없다는 오류 | 3.14 미설치 | uv가 필요한 Python을 자동으로 내려받습니다. 막혀 있으면 `uv python install 3.14` |
 | 처음 내려받기에서 `Can't assign requested address` 같은 재시도 메시지 | 모델 서버 접속이 잠깐 끊김 | 몇 번 재시도하다가 보통 성공합니다. 계속 실패하면 네트워크 확인 후 다시 실행 |
 | 학습이 너무 오래 걸린다 | CPU로 도는 중 | `--device cpu --quick`(1에폭)을 쓰거나 `--mock`으로 흐름만 확인 |
 | 메모리 부족(특히 맥) | 한 번에 올리는 문항이 많음 | 기본값(2문항씩 두 번 누적)이 이미 메모리를 줄인 값입니다. 다른 앱을 닫고 다시 실행 |
 | 활동 모니터의 메모리가 모델 크기보다 훨씬 크게 보임 | 학습 중 임시 계산 공간이 예약됨 | 학습이 끝나면 풀립니다. 이 데모의 정상 동작입니다 |
 | NVIDIA GPU가 있는데 CPU로 도는 것 같다 | Linux/Windows는 CPU 전용 PyTorch를 받도록 설정됨 | `pyproject.toml`의 `[tool.uv.sources]`와 `[[tool.uv.index]]` 블록을 지우고 [PyTorch 설치 안내](https://pytorch.org/get-started/locally/)에 맞는 CUDA 버전 휠로 바꿉니다 |
+| `You are sending unauthenticated requests to the HF Hub` 경고 | 모델 서버에 토큰 없이 접속했다는 안내 | 무해합니다. 토큰(`HF_TOKEN`)은 선택이고 없어도 내려받기와 학습이 됩니다. 진행 막대나 transformers의 길이 안내 문구도 오류가 아니니 무시해도 됩니다 |
 | `--mock`에서 "0/6 → 0/6" | 정상 | 무작위 모델이라 말투를 배우지 못합니다. 실제 모드로 실행하세요 |
 
 ## 더 해 보기
 
 - **어댑터를 원본에 합치기**: PEFT의 `merge_and_unload()`로 어댑터를 원본 모델 숫자에 합치면 어댑터 없이 하나의 모델로 쓸 수 있습니다.
 - **맥에서 더 간편하게**: Apple 실리콘 전용 도구 MLX-LM에도 LoRA 학습 명령이 있습니다.
-- **직접 짠 학습 루프 대신**: 이 데모의 학습 루프는 50줄 남짓한 직접 구현입니다. 같은 일을 Hugging Face `Trainer`나 TRL의 `SFTTrainer`로도 할 수 있습니다.
+- **직접 짠 학습 루프 대신**: 이 데모의 학습 루프는 50줄 남짓(52줄)한 직접 구현입니다. 같은 일을 Hugging Face `Trainer`나 TRL의 `SFTTrainer`로도 할 수 있습니다.
 
 ## 더 알아보기
 
