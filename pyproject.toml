@@ -1,0 +1,40 @@
+[project]
+name = "ai-lab-lora-finetune"
+version = "0.1.0"
+description = "작은 언어 모델을 내 노트북에서 LoRA로 파인튜닝하고 전/후를 보고서 한 장으로 확인하는 데모"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.14"
+# 프로브에서 검증한 버전을 그대로 고정한다
+dependencies = [
+  "torch==2.15.0",
+  "transformers==5.22.2",
+  "peft==0.21.2",
+]
+
+[project.scripts]
+lora-demo = "lora_demo.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["uv_build>=0.13,<0.14"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "lora_demo"
+
+# Linux/Windows에서는 PyPI 기본 휠이 CUDA 포함(수 GB)이라 CPU 전용 인덱스를 쓴다.
+# macOS는 PyPI 휠이 CPU+MPS를 모두 지원한다. NVIDIA GPU를 쓰려면 README 안내대로 이 부분을 바꾼다.
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux' or sys_platform == 'win32'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["real: 실제 모델 내려받기가 필요한 테스트 (LORA_DEMO_REAL=1 일 때만 실행)"]
