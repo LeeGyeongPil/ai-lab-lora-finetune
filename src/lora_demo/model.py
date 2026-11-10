@@ -5,6 +5,7 @@ import json
 import torch
 
 from .config import MODEL_ID, MODEL_REVISION, RunConfig
+from .data import load_jsonl
 
 
 def pick_device(name: str = "auto") -> tuple[torch.device, torch.dtype]:
@@ -39,7 +40,7 @@ def build_mock(cfg: RunConfig):
     from tokenizers import Tokenizer, decoders, models, pre_tokenizers, trainers
     from transformers import PreTrainedTokenizerFast, Qwen2Config, Qwen2ForCausalLM
 
-    rows = [json.loads(line) for line in cfg.data.read_text(encoding="utf-8").splitlines() if line.strip()]
+    rows = load_jsonl(cfg.data)  # data.py 와 같은 로더(utf-8-sig, BOM 허용)로 읽는다
     texts = [m["content"] for r in rows for m in r["messages"]]
     texts += json.loads(cfg.eval_prompts.read_text(encoding="utf-8"))
 

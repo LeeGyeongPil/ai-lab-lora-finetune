@@ -13,6 +13,7 @@ from datetime import datetime
 from pathlib import Path
 
 from .config import MODEL_ID, MODEL_REVISION, RunConfig
+from .data import DataError, validate_jsonl
 
 
 def _at_least_one(value: str) -> int:
@@ -26,15 +27,37 @@ def _at_least_one(value: str) -> int:
     return n
 
 
+def _positive_int(value: str) -> int:
+    """--rank·--epochs 검증: 1 이상의 정수만 받는다."""
+    try:
+        n = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"정수(1 이상)여야 합니다: {value!r}") from None
+    if n < 1:
+        raise argparse.ArgumentTypeError(f"1 이상이어야 합니다 (받은 값: {n})")
+    return n
+
+
+def _positive_float(value: str) -> float:
+    """--lr 검증: 0보다 큰 유한한 실수만 받는다."""
+    try:
+        x = float(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"실수(0보다 큼)여야 합니다: {value!r}") from None
+    if not (x > 0 and x != float("inf")):
+        raise argparse.ArgumentTypeError(f"0보다 큰 유한한 값이어야 합니다 (받은 값: {value})")
+    return x
+
+
 def parse_args(argv=None) -> argparse.Namespace:
     p = argparse.ArgumentParser(prog="lora-demo", description="작은 언어 모델에 LoRA 로 냥체 말투를 입히고 전/후를 보고서로 확인한다.")
     p.add_argument("--mock", action="store_true", help="무작위 초소형 모델로 네트워크 없이 전체 흐름만 확인(수 초)")
     p.add_argument("--device", default="auto", choices=["auto", "cpu", "mps", "cuda"], help="기본 auto: CUDA > MPS > CPU")
-    p.add_argument("--rank", type=int, default=8, help="LoRA 순위 r (기본 8)")
+    p.add_argument("--rank", type=_positive_int, default=8, help="LoRA 순위 r (기본 8)")
     p.add_argument("--targets", default="all-linear", choices=["all-linear", "qv"], help="LoRA 를 붙일 층 (기본 all-linear)")
     p.add_argument("--quick", action="store_true", help="1에폭만 학습(느린 PC용)")
-    p.add_argument("--epochs", type=int, default=None, help="에폭 수(기본 3)")
-    p.add_argument("--lr", type=float, default=None, help="학습률(기본 3e-4)")
+    p.add_argument("--epochs", type=_positive_int, default=None, help="에폭 수(기본 3)")
+    p.add_argument("--lr", type=_positive_float, default=None, help="학습률(기본 3e-4)")
     p.add_argument("--data", type=Path, default=None, help="내 학습 데이터 JSONL (messages 형식). 지정하면 말투 적중률은 계산하지 않음")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--runs-dir", type=Path, default=Path("runs"), help="결과 폴더 (기본 ./runs)")
@@ -48,15 +71,15 @@ def config_from_args(a: argparse.Namespace) -> RunConfig:
                     runs_dir=a.runs_dir, keep_runs=a.keep_runs, max_steps=a.max_steps)
     if a.quick:
         cfg.epochs = 1
-    if a.epochs:
+    if a.epochs is not None:
         cfg.epochs = a.epochs
-    if a.lr:
+    if a.lr is not None:
         cfg.lr = a.lr
     if a.data:
         cfg.data = a.data
     if cfg.mock:
         cfg.apply_mock_defaults()
-        if a.lr:
+        if a.lr is not None:
             cfg.lr = a.lr
     return cfg
 
@@ -232,6 +255,11 @@ def main(argv=None) -> int:
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8")
     cfg = config_from_args(parse_args(argv))
+    try:
+        validate_jsonl(cfg.data)  # 모델 준비 전에 데이터 형식부터 확인 (오류는 줄 번호와 함께)
+    except DataError as e:
+        print(f"오류: {e}", file=sys.stderr)
+        return 2
     try:
         run_pipeline(cfg)
     except RuntimeError as e:
