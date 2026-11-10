@@ -56,3 +56,21 @@ def test_adapter_effect_and_off_switch(two_runs):
     assert losses[-1] < losses[0]
     assert any(x != y for x, y in zip(res["eval"]["before"], res["eval"]["after"]))
     assert res["adapter_off_equals_before"] is True
+
+
+def test_prune_runs_always_keeps_latest(tmp_path):
+    from lora_demo.cli import new_run_dir, prune_runs
+
+    runs = tmp_path / "runs"
+    made = [new_run_dir(runs) for _ in range(3)]
+    for keep in (0, -1):
+        prune_runs(runs, keep)
+        assert made[-1].exists()
+        assert len(list(runs.iterdir())) == 1
+
+
+@pytest.mark.parametrize("bad", ["0", "-1"])
+def test_keep_runs_rejects_non_positive(bad):
+    with pytest.raises(SystemExit) as e:
+        parse_args(["--mock", "--keep-runs", bad])
+    assert e.value.code == 2

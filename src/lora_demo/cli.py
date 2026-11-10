@@ -15,6 +15,17 @@ from pathlib import Path
 from .config import MODEL_ID, MODEL_REVISION, RunConfig
 
 
+def _at_least_one(value: str) -> int:
+    """--keep-runs 검증: 1 이상의 정수만 받는다 (0 이하면 방금 만든 결과까지 지워짐)."""
+    try:
+        n = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"정수(1 이상)여야 합니다: {value!r}") from None
+    if n < 1:
+        raise argparse.ArgumentTypeError("1 이상이어야 합니다 (최근 실행 최소 1개는 남깁니다)")
+    return n
+
+
 def parse_args(argv=None) -> argparse.Namespace:
     p = argparse.ArgumentParser(prog="lora-demo", description="작은 언어 모델에 LoRA 로 냥체 말투를 입히고 전/후를 보고서로 확인한다.")
     p.add_argument("--mock", action="store_true", help="무작위 초소형 모델로 네트워크 없이 전체 흐름만 확인(수 초)")
@@ -27,7 +38,7 @@ def parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--data", type=Path, default=None, help="내 학습 데이터 JSONL (messages 형식). 지정하면 말투 적중률은 계산하지 않음")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--runs-dir", type=Path, default=Path("runs"), help="결과 폴더 (기본 ./runs)")
-    p.add_argument("--keep-runs", type=int, default=5, help="runs/ 에 남길 최근 실행 수 (기본 5)")
+    p.add_argument("--keep-runs", type=_at_least_one, default=5, help="runs/ 에 남길 최근 실행 수 (1 이상, 기본 5)")
     p.add_argument("--max-steps", type=int, default=0, help="이 스텝에서 학습을 멈춤(0이면 에폭 기준)")
     return p.parse_args(argv)
 
@@ -65,6 +76,7 @@ def new_run_dir(runs_dir: Path) -> Path:
 def prune_runs(runs_dir: Path, keep: int) -> None:
     """실행 결과가 무한히 쌓이지 않도록 최근 keep 개만 남긴다 (어댑터가 17MB씩이라)."""
     dirs = sorted(d for d in runs_dir.iterdir() if d.is_dir() and re.fullmatch(r"\d{8}-\d{6}(-\d+)?", d.name))
+    keep = max(1, keep)  # 방금 만든 최신 실행은 항상 남긴다
     for old in dirs[: max(0, len(dirs) - keep)]:
         shutil.rmtree(old)
 
