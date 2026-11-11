@@ -1,5 +1,7 @@
 # LoRA 파인튜닝 — 작은 언어 모델에 말투를 입히고, 전/후를 눈으로 확인하기
 
+**한국어** | [English](README.en.md)
+
 > **English summary** — Fine-tune a small language model (Qwen2.5-0.5B-Instruct) with LoRA on a laptop and see the before/after in one HTML report: only 0.89% of the parameters are trained and the saved adapter is 17.6 MB versus a 988 MB model. Run `uv run lora-demo --mock` to try the whole flow offline in about 6 seconds, or `uv run lora-demo` for the real run (about 3 minutes on an Apple M3 including the first download). LoRA changes the *style* of answers well, but it does not make them *correct*.
 
 ![학습 전, 프롬프트만, 학습 후 답변을 나란히 비교한 보고서 표. 말투 적중은 0/6, 0/6, 6/6이다.](docs/images/06-compare.png)
