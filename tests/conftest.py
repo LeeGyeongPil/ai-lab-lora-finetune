@@ -23,6 +23,17 @@ def no_network(monkeypatch):
     monkeypatch.setattr(socket, "create_connection", blocked)
 
 
+@pytest.fixture(autouse=True)
+def fixed_language(monkeypatch):
+    """언어 환경을 고정한다(기본 ko — 기존 한국어 기대 문구 유지). 환경변수는 하위 프로세스에도 전달된다.
+
+    언어 테스트는 monkeypatch 로 이 값을 덮어쓴다. 실행하는 로캘(LANG 등)과 무관하게 결과가 같아야 한다.
+    """
+    for var in ("LC_ALL", "LC_MESSAGES", "LANG"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("LORA_DEMO_LANG", "ko")
+
+
 @pytest.fixture(scope="session")
 def sample_result() -> dict:
     return json.loads((ROOT / "examples" / "sample-run-m3" / "result.json").read_text(encoding="utf-8"))

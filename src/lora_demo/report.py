@@ -7,6 +7,8 @@ import json
 import sys
 from html import escape as e
 
+from .i18n import resolve_lang, t
+
 CSS = """
 :root{--bg:#fafaf7;--fg:#1e1e1c;--mut:#6b6b66;--card:#fff;--line:#e3e2dc;--acc:#2f6fed;--ok:#1f8a4c;--bad:#c0392b;--bar:#d8d7d0;--warn:#fff4d6}
 @media (prefers-color-scheme:dark){:root{--bg:#161614;--fg:#ecebe6;--mut:#9a9992;--card:#202020;--line:#34332f;--acc:#6ea0ff;--ok:#4cc17f;--bad:#ef6c5d;--bar:#4a4944;--warn:#3a3320}}
@@ -35,7 +37,7 @@ def bar_row(label: str, value: int, total: int, text: str) -> str:
             f'<span class="num">{e(text)}</span></div>')
 
 
-def loss_svg(losses: list[float]) -> str:
+def loss_svg(losses: list[float], lang: str = "en") -> str:
     """손실 곡선: 가로 = 학습 스텝, 세로 = 손실. 폭 900 × 높이 260 의 인라인 SVG."""
     W, H, L, R, T, B = 900, 260, 46, 12, 12, 30
     lo, hi = min(losses), max(losses)
@@ -47,86 +49,112 @@ def loss_svg(losses: list[float]) -> str:
         v = lo + span * k / 4
         y = T + (H - T - B) * (1 - k / 4)
         grid += f'<line class="gr" x1="{L}" x2="{W - R}" y1="{y:.1f}" y2="{y:.1f}"/><text x="{L - 6}" y="{y + 4:.1f}" text-anchor="end">{v:.2f}</text>'
-    xl = f'<text x="{L}" y="{H - 8}">1</text><text x="{W - R}" y="{H - 8}" text-anchor="end">{len(losses)} 스텝</text>'
-    return f'<svg viewBox="0 0 {W} {H}" width="100%" role="img" aria-label="손실 곡선">{grid}{xl}<polyline class="ln" points="{pts}"/></svg>'
+    xl = f'<text x="{L}" y="{H - 8}">1</text><text x="{W - R}" y="{H - 8}" text-anchor="end">{t("r_axis_steps", lang, n=len(losses))}</text>'
+    return f'<svg viewBox="0 0 {W} {H}" width="100%" role="img" aria-label="{t("r_aria_loss", lang)}">{grid}{xl}<polyline class="ln" points="{pts}"/></svg>'
 
 
-def cell(text: str, hit: bool | None) -> str:
+def cell(text: str, hit: bool | None, lang: str = "en") -> str:
     cls = "" if hit is None else ("hit" if hit else "miss")
-    return f'<td class="{cls}">{e(text) or "(빈 답)"}</td>'
+    return f'<td class="{cls}">{e(text) or t("r_empty", lang)}</td>'
 
 
-def render(r: dict) -> str:
+def render(r: dict, lang: str | None = None) -> str:
+    """Render result.json as HTML in ``lang`` ('en'/'ko'; default: LORA_DEMO_LANG, then the locale)."""
     from .evaluate import style_hit
 
+    lang = lang or resolve_lang()
+    L = lambda key, **kw: t(key, lang, **kw)  # noqa: E731  (짧은 별칭)
     m, lo, tr, ev = r["model"], r["lora"], r["train"], r["eval"]
     check = ev.get("style_check", True)
     qn = len(ev["prompts"])
-    out = [f'<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-           f"<title>LoRA 파인튜닝 보고서</title><style>{CSS}</style></head><body><main>"]
-    out.append("<h1>LoRA 파인튜닝 보고서</h1>")
-    out.append(f'<p class="sub">{e(m["id"])} · 장치 {e(r["device"])} ({e(r["dtype"])}) · 실행 {e(r.get("run_name", ""))}</p>')
+    out = [f'<!doctype html><html lang="{lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+           f"<title>{L('r_title')}</title><style>{CSS}</style></head><body><main>"]
+    out.append(f"<h1>{L('r_title')}</h1>")
+    out.append(f'<p class="sub">{L("r_sub", model=e(m["id"]), device=e(r["device"]), dtype=e(r["dtype"]), run=e(r.get("run_name", "")))}</p>')
     if r["mode"] == "mock":
-        out.append('<div class="band"><b>모의 모드</b> — 무작위 초소형 모델이므로 답변 품질은 의미 없습니다. 파이프라인이 도는지만 확인하는 실행입니다.</div>')
+        out.append(f'<div class="band">{L("r_mock")}</div>')
 
     # 1) 얼마나 가벼운가
-    out.append('<section id="light"><h2>1. 얼마나 가벼운가</h2><div class="card">')
-    out.append(bar_row("파라미터", lo["trainable_params"], m["total_params"], f'{lo["trainable_params"]:,} / {m["total_params"]:,}'))
-    out.append(f'<p class="mut" style="margin:0 0 10px">전체의 <b>{lo["trainable_pct"]:.2f}%</b>만 학습했습니다 (r={lo["r"]}, 대상 {e(lo["targets"])})</p>')
-    out.append(bar_row("파일 크기", lo["adapter_bytes"], m["size_bytes"], f'{mb(lo["adapter_bytes"])} / {mb(m["size_bytes"])}'))
-    out.append('<p class="mut" style="margin:0">학습 결과(어댑터)만 저장하면 원본 모델의 일부 크기로 충분합니다. 원본 모델 파일은 건드리지 않습니다.</p></div></section>')
+    out.append(f'<section id="light"><h2>{L("r_h1")}</h2><div class="card">')
+    out.append(bar_row(L("r_params"), lo["trainable_params"], m["total_params"], f'{lo["trainable_params"]:,} / {m["total_params"]:,}'))
+    out.append(f'<p class="mut" style="margin:0 0 10px">{L("r_pct", pct=lo["trainable_pct"], r=lo["r"], targets=e(lo["targets"]))}</p>')
+    out.append(bar_row(L("r_filesize"), lo["adapter_bytes"], m["size_bytes"], f'{mb(lo["adapter_bytes"])} / {mb(m["size_bytes"])}'))
+    out.append(f'<p class="mut" style="margin:0">{L("r_adapter_note")}</p></div></section>')
 
     # 2) 손실 곡선
     ls = tr["losses"]
-    out.append(f'<section id="loss"><h2>2. 손실 곡선</h2><div class="card">{loss_svg(ls)}'
-               f'<p class="mut" style="margin:6px 0 0">{ls[0]:.2f} → {ls[-1]:.2f} ({tr["steps"]} 스텝, 학습 {tr["seconds"]}초, '
-               f'마이크로배치 {tr["micro_batch"]} × 누적 {tr["grad_accum"]}, 학습률 {tr["lr"]})</p></div></section>')
+    out.append(f'<section id="loss"><h2>{L("r_h2")}</h2><div class="card">{loss_svg(ls, lang)}'
+               f'<p class="mut" style="margin:6px 0 0">{L("r_loss_detail", first=ls[0], last=ls[-1], steps=tr["steps"], seconds=tr["seconds"], mb=tr["micro_batch"], ga=tr["grad_accum"], lr=tr["lr"])}</p></div></section>')
 
     # 3) 전/후 답변
-    out.append('<section id="compare"><h2>3. 학습 전/후 답변</h2><table><tr><th>질문 (학습에 없던 것)</th><th>학습 전</th><th>프롬프트만</th><th>학습 후</th></tr>')
+    out.append(f'<section id="compare"><h2>{L("r_h3")}</h2><table><tr><th>{L("r_th_question")}</th><th>{L("r_th_before")}</th><th>{L("r_th_prompt")}</th><th>{L("r_th_after")}</th></tr>')
     for i, q in enumerate(ev["prompts"]):
         h = (lambda k: style_hit(ev[k][i]) if check else None)
-        out.append(f'<tr class="qrow"><td>{e(q)}</td>{cell(ev["before"][i], h("before"))}{cell(ev["prompt_baseline"][i], h("prompt_baseline"))}{cell(ev["after"][i], h("after"))}</tr>')
+        out.append(f'<tr class="qrow"><td>{e(q)}</td>{cell(ev["before"][i], h("before"), lang)}{cell(ev["prompt_baseline"][i], h("prompt_baseline"), lang)}{cell(ev["after"][i], h("after"), lang)}</tr>')
     if check:
-        out.append(f'<tr><th>말투 적중</th><td class="big">{ev["style_hit_before"]}/{qn}</td><td class="big">{ev["style_hit_prompt"]}/{qn}</td><td class="big ok">{ev["style_hit_after"]}/{qn}</td></tr>')
+        out.append(f'<tr><th>{L("r_th_hit")}</th><td class="big">{ev["style_hit_before"]}/{qn}</td><td class="big">{ev["style_hit_prompt"]}/{qn}</td><td class="big ok">{ev["style_hit_after"]}/{qn}</td></tr>')
     out.append("</table>")
     off = r["adapter_off_equals_before"]
-    out.append(f'<p class="mut">어댑터를 끄면 학습 전과 같은 답이 나오는가: <b class="{"ok" if off else "bad"}">{"예" if off else "아니오"}</b> '
-               "(원래 가중치는 그대로이고 어댑터만 켜고 끌 수 있다는 증거)</p></section>")
+    out.append(f'<p class="mut">{L("r_off_q")}<b class="{"ok" if off else "bad"}">{L("r_yes") if off else L("r_no")}</b>{L("r_off_note")}</p></section>')
 
     # 4) 타임라인
-    out.append('<section id="timeline"><h2>4. 학습 진행 타임라인</h2><div class="tl">')
+    out.append(f'<section id="timeline"><h2>{L("r_h4")}</h2><div class="tl">')
     for s in r["snapshots"]:
         out.append(f'<div class="step"><b>step {s["step"]}</b>')
         for q, a in zip(s["questions"], s["answers"]):
-            out.append(f'<div><span class="mut">{e(q)}</span><br>{e(a) or "(빈 답)"}</div>')
+            out.append(f'<div><span class="mut">{e(q)}</span><br>{e(a) or L("r_empty")}</div>')
         out.append("</div>")
     out.append("</div></section>")
 
     # 5) rank 표
-    out.append('<section id="ranks"><h2>5. rank 계산표 (학습 없이 공식으로 계산)</h2><table><tr><th>r</th><th>q·v 층만: 파라미터</th><th>파일</th><th>모든 선형층: 파라미터</th><th>파일</th></tr>')
+    out.append(f'<section id="ranks"><h2>{L("r_h5")}</h2><table><tr><th>r</th><th>{L("r_th_qv")}</th><th>{L("r_th_file")}</th><th>{L("r_th_all")}</th><th>{L("r_th_file")}</th></tr>')
     for row in r["rank_table"]:
         cur = ' style="font-weight:700"' if row["r"] == lo["r"] else ""
         out.append(f'<tr class="rrow"{cur}><td>{row["r"]}</td><td class="n">{row["qv_params"]:,}</td><td class="n">{mb(row["qv_bytes"])}</td><td class="n">{row["all_params"]:,}</td><td class="n">{mb(row["all_bytes"])}</td></tr>')
-    out.append('</table><p class="mut">공식: 층마다 r × (입력 차원 + 출력 차원) 개를 모두 더한다. 파일 크기는 float32(4바이트)로 저장된다고 보고 어림한 값.</p></section>')
+    out.append(f'</table><p class="mut">{L("r_formula")}</p></section>')
 
     # 6) 한계
-    out.append('<section id="limits"><h2>6. 한계 — 말투는 배우지만 지식은 늘지 않는다</h2><div class="card"><ul>'
-               "<li>LoRA 는 <b>말하는 방식</b>(말투·형식)을 빨리 배웁니다. 몇십 스텝이면 충분합니다.</li>"
-               "<li>하지만 <b>새로운 사실</b>은 잘 못 외웁니다. 가상 설정(몽글이·구름숲 도서관)을 묻는 질문의 답을 위 표에서 직접 확인해 보세요.</li>"
-               "<li>말투가 맞아도 내용이 그럴듯한 오답일 수 있습니다. 말투 적중률은 내용이 맞다는 뜻이 아닙니다.</li>"
-               "<li>작은 모델과 100문항이라 답변이 실행마다·설정마다 흔들릴 수 있습니다.</li></ul></div></section>")
+    out.append(f'<section id="limits"><h2>{L("r_h6")}</h2><div class="card"><ul>'
+               f'{L("r_l1")}{L("r_l2")}{L("r_l3")}{L("r_l4")}</ul></div></section>')
 
     # 7) 실행 정보
-    t, v = r["timing"], r["versions"]
-    out.append('<section id="info"><h2>7. 실행 정보</h2><div class="card"><ul>'
-               f'<li>시간: 모델 준비 {t.get("load_s", 0)}초 · 학습 전 답변 {t.get("gen_before_s", 0)}초 · 학습 {t.get("train_s", 0)}초 · 학습 후 답변 {t.get("gen_after_s", 0)}초 · 전체 {t.get("total_s", 0)}초</li>'
-               f'<li>데이터 {tr["examples"]}문항 · 에폭 {tr["epochs"]} · seed {tr["seed"]}</li>'
-               f'<li>Python {e(v["python"])} · torch {e(v["torch"])} · transformers {e(v["transformers"])} · peft {e(v["peft"])}</li>'
+    tm, v = r["timing"], r["versions"]
+    out.append(f'<section id="info"><h2>{L("r_h7")}</h2><div class="card"><ul>'
+               + L("r_time", load=tm.get("load_s", 0), gb=tm.get("gen_before_s", 0), train=tm.get("train_s", 0), ga=tm.get("gen_after_s", 0), total=tm.get("total_s", 0))
+               + L("r_data", examples=tr["examples"], epochs=tr["epochs"], seed=tr["seed"])
+               + f'<li>Python {e(v["python"])} · torch {e(v["torch"])} · transformers {e(v["transformers"])} · peft {e(v["peft"])}</li>'
                "</ul></div></section></main></body></html>")
     return "".join(out)
 
 
+def main(argv: list[str] | None = None) -> int:
+    """CLI entry: one localized line and exit code 2 on a bad argument count or an unreadable input."""
+    argv = sys.argv[1:] if argv is None else argv
+    lang = resolve_lang()
+    if len(argv) != 2:
+        print(t("report_usage", lang), file=sys.stderr)
+        return 2
+    try:
+        with open(argv[0], encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, UnicodeDecodeError, ValueError) as err:
+        print(t("report_input_error", lang, path=argv[0], error=err.__class__.__name__), file=sys.stderr)
+        return 2
+    try:
+        html = render(data, lang)
+    except (KeyError, TypeError, IndexError, AttributeError, ValueError) as err:
+        # 파일은 읽혔지만 result.json 모양이 아니다 → 경로가 아니라 파일 종류를 안내한다
+        print(t("report_not_result", lang, path=argv[0], error=err.__class__.__name__), file=sys.stderr)
+        return 2
+    try:
+        with open(argv[1], "w", encoding="utf-8") as f:
+            f.write(html)
+    except OSError as err:
+        print(t("report_output_error", lang, path=argv[1], error=err.__class__.__name__), file=sys.stderr)
+        return 2
+    return 0
+
+
 if __name__ == "__main__":
-    data = json.loads(open(sys.argv[1], encoding="utf-8").read())
-    open(sys.argv[2], "w", encoding="utf-8").write(render(data))
+    # 언어: LORA_DEMO_LANG > LC_ALL > LC_MESSAGES > LANG (인자 형식은 그대로)
+    sys.exit(main())
