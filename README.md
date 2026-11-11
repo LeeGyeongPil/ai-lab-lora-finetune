@@ -42,7 +42,7 @@ uv run lora-demo --mock
 `--mock` is a mode that checks only the overall flow with a **tiny randomly generated model**. It needs no network and finishes in about 6 seconds (excluding the package installation time of the first run). It is normal that it cannot learn the real style, and because the model is random, the answers also come out as unreadable characters like `\x12\x12…` (this is on purpose) — seeing "0/6 → 0/6" does not mean it is broken. This mode is for checking that all 6 steps run to the end and that the report gets created.
 
 ![Screen of the mock-mode run. A 6-step log is shown, from device check to save complete.](docs/images/02-mock-run.png)
-<sub>Result of running `uv run lora-demo --mock`. The intermediate step lines of the [5/6] training stage are shortened here for space.</sub>
+<sub>Result of running `uv run lora-demo --mock --lang en`. The intermediate step lines of the [5/6] training stage are shortened here for space.</sub>
 
 ### Training with the real model
 
@@ -63,6 +63,32 @@ It downloads the model once on the first run (about 1GB), trains, and saves the 
 - On Linux/Windows, `pyproject.toml` is set up to download **CPU-only PyTorch** instead of the CUDA-bundled wheels that take several GB.
 - Times vary with the PC and its load at the time. The numbers above are values measured once on a single machine.
 
+### Choosing the language (English / Korean)
+
+The command-line messages (`--help`, progress log, errors) and the HTML report text come in English and Korean. The language is picked in this order, and anything that does not start with `ko` falls back to English:
+
+1. `--lang en|ko`
+2. the `LORA_DEMO_LANG` environment variable
+3. `LC_ALL`, then `LC_MESSAGES`, then `LANG` (the system locale)
+
+```bash
+uv run lora-demo --mock --lang ko        # Korean output and a Korean report
+LORA_DEMO_LANG=ko uv run lora-demo --mock # the same, via the environment
+```
+
+Last line of the real output of `lora-demo --rank 0` (a short usage block comes first; exit code 2 in both cases):
+
+```text
+$ lora-demo --lang en --rank 0
+lora-demo: error: argument --rank: must be 1 or more (got: 0)
+$ lora-demo --lang ko --rank 0
+lora-demo: error: argument --rank: 1 이상이어야 합니다 (받은 값: 0)
+```
+
+Known limits: the standard argparse words (`usage:`, `options:`, `error:`, the `-h` help line) stay in English even with `--lang ko`; and `examples/sample-run-m3/report.html` is a Korean-language report (the same run shown in Korean).
+
+If you used this demo before and your system locale is not Korean, the output is now English by default; add `--lang ko` or set `LORA_DEMO_LANG=ko` to get Korean back. Only the screen text changes. `result.json`, `train_log.csv`, the adapter files, the training data and the questions and answers inside the report stay the same in both languages. `uv run python -m lora_demo.report <result.json> <out.html>` follows `LORA_DEMO_LANG`, then the locale.
+
 ## Follow along step by step
 
 ### Step 1. Look at the training data
@@ -78,7 +104,7 @@ The training questions are mostly general knowledge like the sky, sunsets and ra
 
 In steps [1/6] to [4/6], `uv run lora-demo` picks the device, loads the model, records the answers before training, and then attaches LoRA. Saving the "answers before training" in advance is important here, because they become the baseline for the comparison later.
 
-The key number in the log is `학습 파라미터 4,399,104 / 494,032,768 (0.89%)` (trained parameters 4,399,104 / 494,032,768). A **parameter** is each of the adjustable numbers (weights) the model holds. Of the model's roughly 494 million numbers, **only about 4.4 million (0.89%)** are trained, and the rest are frozen.
+The key number in the log is `trainable params 4,399,104 / 494,032,768 (0.89%)`. A **parameter** is each of the adjustable numbers (weights) the model holds. Of the model's roughly 494 million numbers, **only about 4.4 million (0.89%)** are trained, and the rest are frozen.
 
 ![Parameter bar and file size bar. Trained parameters are 0.89% of the total, and the adapter file is 17.6MB, much smaller than the original 988.1MB.](docs/images/04-light.png)
 <sub>The "How light is it" box of the report. The blue part is the share trained (0.89% of parameters) and the saved file size (17.6MB / 988.1MB).</sub>
@@ -107,7 +133,7 @@ In step [6/6], the report is saved. The picture at the very top is that table. I
 
 "Style hit" is a rule that only checks whether the answer starts with `냥!` and ends with `냥. 🐾` (a one-line regular expression, `src/lora_demo/evaluate.py`). It does not look at whether the content is correct.
 
-Finally, `어댑터 끄면 학습 전과 같은 답: True` in the log ("same answer as before training with the adapter off: True") confirms that **turning the adapter off gives back the original model's answers exactly**. It is evidence that the original numbers did not change during the whole training.
+Finally, `Adapter off gives the same answers as before training: True` in the log confirms that **turning the adapter off gives back the original model's answers exactly**. It is evidence that the original numbers did not change during the whole training.
 
 ### Step 5. See how the size changes when you change the rank
 
@@ -240,7 +266,7 @@ opt.step()        # 모아 둔 기울기로 한 번 갱신
    - Each message's `role` and `content` must both be strings.
    - Before the last `assistant` message there must be at least one `user` message, and the conversation must end with an `assistant` answer.
 
-   If the file format is wrong, it stops before training starts with the line number, like `오류: 파일:N번째 줄: …` ("Error: file: line N: …") (exit code 2). `--epochs` and `--lr` do not allow 0; they must be greater than 0.
+   If the file format is wrong, it stops before training starts with the line number, like `error: file:N: …` (in Korean `오류: 파일:N번째 줄: …`) (exit code 2). `--epochs` and `--lr` do not allow 0; they must be greater than 0.
 
    When you use your own data, the "nyang-style hit rate" is not computed. Also, the evaluation questions used to compare before/after answers are the default 6 (`data/eval_prompts.json`, questions for the nyang style), regardless of your data. If you want to compare with questions from your own field, change the questions in this file yourself, save it, and then run. You can compare directly using the report's before/after answer table.
 4. **Where results go** — run results pile up in `runs/`, and only the latest 5 are kept (change with `--keep-runs`, 1 or more). Since one adapter is 17.6MB, this is so they do not accumulate without limit.
@@ -248,10 +274,8 @@ opt.step()        # 모아 둔 기울기로 한 번 갱신
 If you only want to regenerate the report:
 
 ```bash
-uv run python -m lora_demo.report <result.json> <출력.html>
+uv run python -m lora_demo.report <result.json> <out.html>
 ```
-
-(`<출력.html>` means "output .html".)
 
 ## Limits — the style changes, but the content does not become correct
 
