@@ -35,7 +35,7 @@ def test_message_keys_match():
 
 def test_version_is_consistent():
     pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert __version__ == pyproject["project"]["version"] == "0.2.1"
+    assert __version__ == pyproject["project"]["version"] == "0.2.2"
 
 
 @pytest.mark.parametrize("cli,env,expected", [

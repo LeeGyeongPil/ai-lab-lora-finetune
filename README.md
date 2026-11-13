@@ -299,6 +299,7 @@ uv run python -m lora_demo.report <result.json> <out.html>
 | Activity Monitor shows memory much larger than the model size | Temporary compute space is reserved during training | It is released when training finishes. This is normal behavior for this demo |
 | You have an NVIDIA GPU but it seems to run on CPU | On Linux/Windows it is set up to download CPU-only PyTorch | Delete the `[tool.uv.sources]` and `[[tool.uv.index]]` blocks in `pyproject.toml` and switch to the wheel for your CUDA version from the [PyTorch install guide](https://pytorch.org/get-started/locally/) |
 | A `You are sending unauthenticated requests to the HF Hub` warning | A notice that the model server was accessed without a token | Harmless. The token (`HF_TOKEN`) is optional, and downloading and training work without it. The progress bar and transformers' length notices are not errors either and can be ignored |
+| A `FutureWarning` about `is_gradient_checkpointing` from inside peft | peft still reads a transformers setting that is being renamed | Harmless. Training and results are unaffected and the warning can be ignored |
 | "0/6 → 0/6" in `--mock` | Normal | It is a random model, so it cannot learn the style. Run in real mode |
 
 ## Going further

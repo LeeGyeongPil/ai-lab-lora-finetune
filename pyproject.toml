@@ -1,6 +1,6 @@
 [project]
 name = "ai-lab-lora-finetune"
-version = "0.2.1"
+version = "0.2.2"
 description = "작은 언어 모델을 내 노트북에서 LoRA로 파인튜닝하고 전/후를 보고서 한 장으로 확인하는 데모"
 readme = "README.md"
 license = { text = "MIT" }
@@ -8,7 +8,7 @@ requires-python = ">=3.14"
 # 프로브에서 검증한 버전을 그대로 고정한다
 dependencies = [
   "torch==2.15.0",
-  "transformers==5.22.2",
+  "transformers==5.23.0",
   "peft==0.21.3",
 ]
 

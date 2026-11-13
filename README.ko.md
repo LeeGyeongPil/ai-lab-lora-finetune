@@ -295,6 +295,7 @@ uv run python -m lora_demo.report <result.json> <출력.html>
 | 활동 모니터의 메모리가 모델 크기보다 훨씬 크게 보임 | 학습 중 임시 계산 공간이 예약됨 | 학습이 끝나면 풀립니다. 이 데모의 정상 동작입니다 |
 | NVIDIA GPU가 있는데 CPU로 도는 것 같다 | Linux/Windows는 CPU 전용 PyTorch를 받도록 설정됨 | `pyproject.toml`의 `[tool.uv.sources]`와 `[[tool.uv.index]]` 블록을 지우고 [PyTorch 설치 안내](https://pytorch.org/get-started/locally/)에 맞는 CUDA 버전 휠로 바꿉니다 |
 | `You are sending unauthenticated requests to the HF Hub` 경고 | 모델 서버에 토큰 없이 접속했다는 안내 | 무해합니다. 토큰(`HF_TOKEN`)은 선택이고 없어도 내려받기와 학습이 됩니다. 진행 막대나 transformers의 길이 안내 문구도 오류가 아니니 무시해도 됩니다 |
+| peft 내부에서 나오는 `is_gradient_checkpointing` `FutureWarning` | peft가 transformers에서 이름이 바뀌는 설정을 아직 읽고 있음 | 무해합니다. 학습과 결과에는 영향이 없으니 무시해도 됩니다 |
 | `--mock`에서 "0/6 → 0/6" | 정상 | 무작위 모델이라 말투를 배우지 못합니다. 실제 모드로 실행하세요 |
 
 ## 더 해 보기
