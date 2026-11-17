@@ -8,6 +8,14 @@ from .config import MODEL_ID, MODEL_REVISION, RunConfig
 from .data import load_jsonl
 
 
+class DeviceUnavailableError(Exception):
+    """The requested accelerator (cuda / mps) is not available in this PyTorch build."""
+
+    def __init__(self, device: str):
+        super().__init__(device)
+        self.device = device
+
+
 def pick_device(name: str = "auto") -> tuple[torch.device, torch.dtype]:
     """장치와 정밀도를 고른다. CUDA·MPS는 bfloat16, CPU는 float32."""
     if name == "auto":
@@ -17,6 +25,10 @@ def pick_device(name: str = "auto") -> tuple[torch.device, torch.dtype]:
             name = "mps"
         else:
             name = "cpu"
+    if name == "cuda" and not torch.cuda.is_available():
+        raise DeviceUnavailableError(name)  # 모델을 올리기 전에 막는다
+    if name == "mps" and not torch.backends.mps.is_available():
+        raise DeviceUnavailableError(name)
     dtype = torch.float32 if name == "cpu" else torch.bfloat16
     return torch.device(name), dtype
 

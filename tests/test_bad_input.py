@@ -72,3 +72,37 @@ def test_bom_utf8_accepted(tmp_path):
     # 모의 모드 전체 실행(build_mock 이 데이터를 다시 읽는 경로)도 BOM 파일로 끝까지 돌아야 한다
     code = main(["--mock", "--runs-dir", str(tmp_path / "runs"), "--max-steps", "1", "--data", str(p)])
     assert code == 0
+
+
+@pytest.mark.parametrize("device", ["cuda", "mps"])
+@pytest.mark.parametrize("lang,needle", [("en", "Cannot use --device"), ("ko", "를 쓸 수 없습니다")])
+def test_unavailable_accelerator_exit_2(tmp_path, capsys, monkeypatch, device, lang, needle):
+    import torch
+
+    import lora_demo.model as model
+
+    # run_pipeline 이 처음 불러오는 무거운 모듈(transformers·peft)을 패치 전에 미리 불러온다.
+    # 패치된 torch 위에서 처음 import 하면 torch._dynamo 가 깨져 단독 실행이 실패한다.
+    import peft  # noqa: F401
+    import transformers  # noqa: F401
+    import lora_demo.evaluate, lora_demo.lora, lora_demo.report, lora_demo.train  # noqa: F401,E401
+
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    monkeypatch.setattr(torch.backends.mps, "is_available", lambda: False)
+    called = []
+    monkeypatch.setattr(model, "load_real", lambda *a, **k: called.append(1))
+    code = main(["--device", device, "--lang", lang, "--runs-dir", str(tmp_path / "runs")])
+    cap = capsys.readouterr()
+    assert code == 2 and not called
+    assert needle in cap.err and device in cap.err and "Traceback" not in cap.err
+    # 우리 오류는 정확히 한 줄 (처음 import 때 torch 가 찍는 무관한 경고 줄은 세지 않는다)
+    assert len([ln for ln in cap.err.splitlines() if needle in ln]) == 1
+    assert cap.err.strip().splitlines()[-1].count(needle) == 1
+    assert "[2/6]" not in cap.out
+
+
+def test_mock_ignores_unavailable_device(tmp_path, monkeypatch):
+    import torch
+
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    assert main(["--mock", "--device", "cuda", "--max-steps", "1", "--runs-dir", str(tmp_path / "runs")]) == 0

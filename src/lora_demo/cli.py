@@ -16,6 +16,7 @@ from pathlib import Path
 from .config import MODEL_ID, MODEL_REVISION, RunConfig
 from .data import DataError, validate_jsonl
 from .i18n import LANGS, resolve_lang
+from .model import DeviceUnavailableError
 from .i18n import t as msg
 
 
@@ -307,6 +308,7 @@ def main(argv=None) -> int:
     lang = args.lang
     cfg = config_from_args(args)
     prefix = msg("error_prefix", lang)
+
     try:
         validate_jsonl(cfg.data)  # 모델 준비 전에 데이터 형식부터 확인 (오류는 줄 번호와 함께)
         check_runs_dir(cfg.runs_dir)  # 결과를 저장할 수 있는지도 학습 전에 확인 (날짜-시각 하위 폴더는 저장 시점에 만든다)
@@ -316,6 +318,9 @@ def main(argv=None) -> int:
         return 2
     except RunsDirError as e:
         print(f"{prefix}{msg('runs_dir_unwritable', lang, path=e.path, error=e.error.__class__.__name__)}", file=sys.stderr)
+        return 2
+    except DeviceUnavailableError as e:
+        print(f"{prefix}{msg('device_unavailable', lang, device=e.device, reason=msg('device_reason_' + e.device, lang))}", file=sys.stderr)
         return 2
     except RuntimeError as e:
         if "out of memory" in str(e).lower():
